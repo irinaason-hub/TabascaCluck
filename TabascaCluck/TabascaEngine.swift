@@ -107,8 +107,10 @@ final class TabascaEngine: ObservableObject {
             }
             phase = .work
             secondsRemaining = workSeconds
-            currentTrackIndex += 1
-            playCurrentRoundTrack()
+            if roundsPerSet > 0 && (round % roundsPerSet) == 0 {
+                currentTrackIndex += 1
+                playCurrentRoundTrack()
+            }
         }
     }
 
