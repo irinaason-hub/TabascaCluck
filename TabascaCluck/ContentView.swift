@@ -10,6 +10,8 @@ import Combine
 
 struct ContentView: View {
     @EnvironmentObject var spotify: SpotifyController
+    @EnvironmentObject var duck: DuckingAudioController
+
     @StateObject private var engineHolder = EngineHolder()
 
     @State private var playlistURL: String = ""
@@ -17,7 +19,7 @@ struct ContentView: View {
     @State private var sets: Int = 8
 
     var body: some View {
-        let engine = engineHolder.engine(spotify: spotify)
+        let engine = engineHolder.engine(spotify: spotify, duck: duck)
 
         VStack(spacing: 16) {
             Text("Tabasca Cluck")
@@ -118,9 +120,9 @@ final class EngineHolder: ObservableObject {
     @Published private(set) var engine: TabascaEngine?
     private var engineCancellable: AnyCancellable?
 
-    func engine(spotify: SpotifyController) -> TabascaEngine {
+    func engine(spotify: SpotifyController, duck: DuckingAudioController) -> TabascaEngine {
         if let e = engine { return e }
-        let e = TabascaEngine(spotify: spotify)
+        let e = TabascaEngine(spotify: spotify, duck: duck)
         engine = e
         engineCancellable = e.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()

@@ -19,6 +19,7 @@ struct TabascaCluckApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(appDelegate.spotify)
+                .environmentObject(appDelegate.duck)
                 .onOpenURL { url in
                     print("TabascaCluckApp onOpenURL received: \(url)")
                     _ = appDelegate.spotify.handleAuthCallback(url: url)
@@ -26,3 +27,4 @@ struct TabascaCluckApp: App {
         }
     }
 }
+

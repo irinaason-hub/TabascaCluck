@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
     // Expose manager to SwiftUI
     let spotify = SpotifyController()
+    let duck = DuckingAudioController()
 
     func application(
         _ application: UIApplication,

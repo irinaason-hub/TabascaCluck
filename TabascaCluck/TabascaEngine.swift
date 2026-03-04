@@ -30,11 +30,13 @@ final class TabascaEngine: ObservableObject {
     private var currentTrackIndex: Int = 0
 
     private let spotify: SpotifyController
+    private let duck: DuckingAudioController
 
     private var lastPhaseBeforePause: Phase = .idle
 
-    init(spotify: SpotifyController) {
+    init(spotify: SpotifyController, duck: DuckingAudioController) {
         self.spotify = spotify
+        self.duck = duck
     }
 
     func configureRounds(_ n: Int) {
@@ -98,8 +100,15 @@ final class TabascaEngine: ObservableObject {
         if phase == .work {
             phase = .rest
             secondsRemaining = restSeconds
-            // NOTE: keep playback running through the rest period (user requested music should not stop after work)
+
+            guard let pauseURL = Bundle.main.url(forResource: "round_\(round+1)_V1", withExtension: "mp3") else {
+                print("File round_\(round+1)_V1.mp3 missing")
+                return
+            }
+            try? duck.startDucking(with: pauseURL, volume: 1)
+            
         } else if phase == .rest {
+        duck.stopDucking();
             round += 1
             if round >= totalRounds {
                 finish()
