@@ -1,2 +1,7 @@
 /SpotifyiOS.xcframework/
-/.idea/vcs.xml
+/.idea/*
+
+/TabascaCluck.xcodeproj/xcuserdata
+/TabascaCluck.xcodeproj/project.xcworkspace
+/audio-parts/
+

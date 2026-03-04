@@ -101,14 +101,14 @@ final class TabascaEngine: ObservableObject {
             phase = .rest
             secondsRemaining = restSeconds
 
-            guard let pauseURL = Bundle.main.url(forResource: "round_\(round+1)_V1", withExtension: "mp3") else {
-                print("File round_\(round+1)_V1.mp3 missing")
+            guard let pauseURL = Bundle.main.url(forResource: "round_\(round+1)_completed", withExtension: "mp3") else {
+                print("File round_\(round+1)_completed.mp3 missing")
                 return
             }
             try? duck.startDucking(with: pauseURL, volume: 1)
             
         } else if phase == .rest {
-        duck.stopDucking();
+            duck.stopDucking();
             round += 1
             if round >= totalRounds {
                 finish()
