@@ -7,6 +7,8 @@
 
 import Foundation
 import Combine
+import AVFoundation
+import UIKit
 
 @MainActor
 final class TabascaEngine: ObservableObject {
@@ -25,7 +27,7 @@ final class TabascaEngine: ObservableObject {
     var workSeconds: Int = 20
     var restSeconds: Int = 10
 
-    private var timer: Timer?
+    private var timer: DispatchSourceTimer?
     private var tracks: [String] = []
     private var currentTrackIndex: Int = 0
 
@@ -33,6 +35,8 @@ final class TabascaEngine: ObservableObject {
     private let duck: DuckingAudioController
 
     private var lastPhaseBeforePause: Phase = .idle
+
+    private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
 
     init(spotify: SpotifyController, duck: DuckingAudioController) {
         self.spotify = spotify
@@ -44,11 +48,14 @@ final class TabascaEngine: ObservableObject {
     }
 
     func start(withTrackURIs uris: [String]) {
-        tracks = uris
+        tracks = uris.shuffled()
         round = 0
         currentTrackIndex = 0
         phase = .work
         secondsRemaining = workSeconds
+
+        configureAudioSessionForBackground()
+
         playCurrentRoundTrack()
         startTimer()
     }
@@ -79,14 +86,24 @@ final class TabascaEngine: ObservableObject {
 
     private func startTimer() {
         stopTimer()
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.tick() }
+        beginBackgroundTask()
+
+        let queue = DispatchQueue(label: "com.tabasca.engine.timer", qos: .userInitiated)
+        let t = DispatchSource.makeTimerSource(queue: queue)
+        t.schedule(deadline: .now() + 1.0, repeating: 1.0)
+        t.setEventHandler { [weak self] in
+            Task { @MainActor in
+                self?.tick()
+            }
         }
+        timer = t
+        t.resume()
     }
 
     private func stopTimer() {
-        timer?.invalidate()
+        timer?.cancel()
         timer = nil
+        endBackgroundTask()
     }
 
     private func tick() {
@@ -100,15 +117,23 @@ final class TabascaEngine: ObservableObject {
         if phase == .work {
             phase = .rest
             secondsRemaining = restSeconds
+            
+            var urlStr = "round_\(round + 1)_completed"
+            if((round + 1) >= roundsPerSet) {
+                urlStr = "finish"
+            } else if((round + 1) % roundsPerSet == 0){
+                urlStr = "set_\(currentSetNumber)_completed"
+                
+            }
 
-            guard let pauseURL = Bundle.main.url(forResource: "round_\(round+1)_completed", withExtension: "mp3") else {
-                print("File round_\(round+1)_completed.mp3 missing")
+            guard let pauseURL = Bundle.main.url(forResource: urlStr, withExtension: "mp3") else {
+                print("File \(urlStr).mp3 missing")
                 return
             }
             try? duck.startDucking(with: pauseURL, volume: 1)
-            
+
         } else if phase == .rest {
-            duck.stopDucking();
+            duck.stopDucking()
             round += 1
             if round >= totalRounds {
                 finish()
@@ -138,4 +163,28 @@ final class TabascaEngine: ObservableObject {
 
     var currentSetNumber: Int { (round / max(1, roundsPerSet)) + 1 }
     var currentRoundInSet: Int { (round % max(1, roundsPerSet)) + 1 }
+
+    // MARK: - Background & Audio helpers
+    private func configureAudioSessionForBackground() {
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(.playback, mode: .default, options: [.duckOthers])
+            try session.setActive(true)
+        } catch {
+            print("Failed to configure AVAudioSession: \(error)")
+        }
+    }
+
+    private func beginBackgroundTask() {
+        guard backgroundTask == .invalid else { return }
+        backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "TabascaEngineTimer") { [weak self] in
+            self?.endBackgroundTask()
+        }
+    }
+
+    private func endBackgroundTask() {
+        guard backgroundTask != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(backgroundTask)
+        backgroundTask = .invalid
+    }
 }

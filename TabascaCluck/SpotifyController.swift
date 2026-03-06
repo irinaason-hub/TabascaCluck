@@ -52,9 +52,14 @@ final class SpotifyController: NSObject, ObservableObject {
             "playlist-read-collaborative"
         ]
         
+        wakeUp()
+       
+        statusText = "Opening Spotify login…"
+    }
+    
+    func wakeUp() {
         appRemote.authorizeAndPlayURI("spotify:track:0Z2B3ArGjNi86MkZgWDCNp", asRadio: false,
                                       additionalScopes: scopes, completionHandler: nil)
-        statusText = "Opening Spotify login…"
     }
 
     func handleAuthCallback(url: URL) -> Bool {

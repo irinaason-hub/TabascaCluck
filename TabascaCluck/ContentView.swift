@@ -58,11 +58,11 @@ struct ContentView: View {
              }
 
             HStack {
-                Stepper("Rounds per set: \(rounds)", value: $rounds, in: 1...50)
+                Stepper("Rounds per set: \(rounds)", value: $rounds, in: 1...8)
                     .onChange(of: rounds) { _, newValue in
                         engine.configureRounds(newValue)
                     }
-                Stepper("Sets: \(sets)", value: $sets, in: 1...50)
+                Stepper("Sets: \(sets)", value: $sets, in: 1...8)
                     .onChange(of: sets) { _, newValue in
                         engine.sets = max(1, newValue)
                     }
