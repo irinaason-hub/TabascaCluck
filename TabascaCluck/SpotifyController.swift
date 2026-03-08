@@ -52,12 +52,11 @@ final class SpotifyController: NSObject, ObservableObject {
             "playlist-read-collaborative"
         ]
         
-        wakeUp()
-       
+        wakeUp(scopes: scopes)
         statusText = "Opening Spotify login…"
     }
     
-    func wakeUp() {
+    func wakeUp(scopes: [String] = []) {
         appRemote.authorizeAndPlayURI("spotify:track:0Z2B3ArGjNi86MkZgWDCNp", asRadio: false,
                                       additionalScopes: scopes, completionHandler: nil)
     }
@@ -206,6 +205,8 @@ extension SpotifyController: SPTAppRemoteDelegate {
     func appRemote(_ appRemote: SPTAppRemote, didDisconnectWithError error: Error?) {
         isAppRemoteConnected = false
         statusText = "Spotify disconnected"
+        
+        //todo: resume connection here if the app was disconnected
     }
 }
 
