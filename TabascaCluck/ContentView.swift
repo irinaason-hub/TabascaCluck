@@ -17,15 +17,38 @@ struct ContentView: View {
     @State private var playlistURL: String = ""
     @State private var rounds: Int = 8
     @State private var sets: Int = 8
+    
+    @State private var subtitles: [String] = [
+        "Reveal Your Fluffiness",
+        "Unleash Your Inner Chicken",
+        "Train the Chicken Within",
+        "From Fluffy to Feisty",
+        "Cluck Into Shape",
+        "Hatch Your Power",
+        "Turn Fluff Into Fire",
+        "Fluff Today. Beast Tomorrow",
+        "Peck. Rest. Repeat.",
+        "Cluck Your Limits",
+        "Where Chickens Become Legends",
+        "Small Bird. Big Burn."
+    ]
+    
+    @State private var selectedSubtitle: String = ""
+    
+    @State private var isLoadingOverlayVisible = true
+
 
     var body: some View {
         let engine = engineHolder.engine(spotify: spotify, duck: duck)
+        
+        //todo: add loading image
+        //todo: add background image
 
         VStack(spacing: 16) {
             Text("Tabasca Cluck")
                 .font(.title2).bold()
 
-            Text(spotify.statusText)
+            Text(selectedSubtitle)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
@@ -102,7 +125,10 @@ struct ContentView: View {
             Spacer()
         }
         .padding()
-        .onAppear { engine.configureRounds(rounds) }
+        .onAppear {
+            engine.configureRounds(rounds)
+            if let s = subtitles.randomElement() { selectedSubtitle = s }
+        }
     }
 
     private func phaseLabel(_ p: TabascaEngine.Phase) -> String {
@@ -114,6 +140,12 @@ struct ContentView: View {
         case .finished: return "Done"
         }
     }
+}
+
+#Preview {
+    ContentView()
+        .environmentObject(SpotifyController())
+        .environmentObject(DuckingAudioController())
 }
 
 final class EngineHolder: ObservableObject {
