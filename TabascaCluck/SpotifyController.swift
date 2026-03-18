@@ -16,6 +16,13 @@ final class SpotifyController: NSObject, ObservableObject {
     // MARK: - Configure these
     private let clientID = "b5deb90282b6483e92ba9c828a91ead6"
     private let redirectURI = URL(string: "tabasca-cluck://callback")!
+    private let scopes: [String] = [
+                                        "app-remote-control",
+                                        "user-modify-playback-state",
+                                        "user-read-playback-state",
+                                        "playlist-read-private",
+                                        "playlist-read-collaborative"
+                                    ]
 
     // MARK: - Published state
     @Published var isLoggedIn = false
@@ -23,6 +30,11 @@ final class SpotifyController: NSObject, ObservableObject {
     @Published var statusText: String = "Not logged in"
     @Published var playlistTracks: [String] = []   // Spotify track URIs
     @Published var playlistName: String = ""
+
+    // MARK: - Playback resume cache
+    private var lastKnownURI: String?
+    private var lastKnownPositionMs: Int = 0
+    private var pendingResumeAfterReconnect: Bool = false
 
     // MARK: - Spotify SDK
     private lazy var configuration: SPTConfiguration = {
@@ -44,14 +56,6 @@ final class SpotifyController: NSObject, ObservableObject {
 
     // MARK: - Auth
     func login() {
-        let scopes: [String] = [
-            "app-remote-control",
-            "user-modify-playback-state",
-            "user-read-playback-state",
-            "playlist-read-private",
-            "playlist-read-collaborative"
-        ]
-        
         wakeUp(scopes: scopes)
         statusText = "Opening Spotify login…"
     }
@@ -71,7 +75,6 @@ final class SpotifyController: NSObject, ObservableObject {
         }
 
         accessToken = token
-
         isLoggedIn = true
         statusText = "Logged in"
         connectAppRemoteIfPossible()
@@ -88,7 +91,7 @@ final class SpotifyController: NSObject, ObservableObject {
         appRemote.connectionParameters.accessToken = token
         appRemote.delegate = self
         appRemote.connect()
-        statusText = "Connecting to Spotify"
+        statusText = isAppRemoteConnected ? "Reconnecting to Spotify" : "Connecting to Spotify"
     }
 
     func disconnectAppRemote() {
@@ -108,12 +111,27 @@ final class SpotifyController: NSObject, ObservableObject {
 
     func pause() {
         guard appRemote.isConnected else { return }
-        appRemote.playerAPI?.pause { _, _ in }
+        // Attempt to capture current state before pausing
+        appRemote.playerAPI?.getPlayerState({ [weak self] result, error in
+            if let state = result as? SPTAppRemotePlayerState {
+                self?.lastKnownURI = state.track.uri
+                self?.lastKnownPositionMs = state.playbackPosition
+            }
+            // Now pause playback
+            self?.appRemote.playerAPI?.pause { _, _ in }
+        })
     }
 
     func resume() {
-        guard appRemote.isConnected else { return }
-        appRemote.playerAPI?.resume { _, _ in }
+        if appRemote.isConnected {
+            appRemote.playerAPI?.resume { _, _ in }
+            return
+        }
+
+        // Not connected: reconnect and mark that we should resume after connection
+        pendingResumeAfterReconnect = true
+        wakeUp(scopes: scopes)
+        connectAppRemoteIfPossible()
     }
 
     // MARK: - Playlist parsing + fetch (Web API)
@@ -195,6 +213,24 @@ extension SpotifyController: SPTAppRemoteDelegate {
         appRemote.playerAPI?.subscribe(toPlayerState: { _, error in
             if let error = error { print("Subscribe error:", error) }
         })
+
+        // If we were asked to resume after reconnect, do it now
+        if pendingResumeAfterReconnect {
+            pendingResumeAfterReconnect = false
+
+            if let uri = lastKnownURI {
+                appRemote.playerAPI?.play(uri, callback: { [weak self] _, _ in
+                    guard let self = self else { return }
+                    self.appRemote.playerAPI?.seek(toPosition: self.lastKnownPositionMs, callback: { _, _ in
+                        print("Default resume 1")
+                    })
+                })
+                lastKnownURI = nil
+            }
+            else {
+                print("Default resume 2")
+            }
+        }
     }
 
     func appRemote(_ appRemote: SPTAppRemote, didFailConnectionAttemptWithError error: Error?) {
@@ -205,17 +241,14 @@ extension SpotifyController: SPTAppRemoteDelegate {
     func appRemote(_ appRemote: SPTAppRemote, didDisconnectWithError error: Error?) {
         isAppRemoteConnected = false
         statusText = "Spotify disconnected"
-        
-        //todo: resume connection here if the app was disconnected
+        print("App Remote disconnected. Cached uri=\(lastKnownURI ?? "nil"), pos=\(lastKnownPositionMs)")
     }
 }
 
 // MARK: - Player state delegate
 extension SpotifyController: SPTAppRemotePlayerStateDelegate {
     func playerStateDidChange(_ playerState: SPTAppRemotePlayerState) {
-        // You can read playerState.track.name etc if you want.
-        // Protocol describes the player state object. :contentReference[oaicite:9]{index=9}
-        print ("extension SpotifyController: SPTAppRemotePlayerStateDelegate called");
+
     }
 }
 
